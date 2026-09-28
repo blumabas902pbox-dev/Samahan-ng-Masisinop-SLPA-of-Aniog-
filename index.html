@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Samahan ng Masisinop - Homepage</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <script src="script.js" defer></script>
+</head>
+<body>
+
+<div class="fixed-header-wrapper">
+    <header class="site-header">
+        <div class="header-logo-left">
+            <img src="logo.png" alt="Barangay Aniog Seal" loading="lazy">
+        </div>
+        <div class="header-center">
+            <h1>Samahan ng Masisinop</h1>
+            <p>Sustainable Livelihood Program (SLPA) Aniog</p>
+        </div>
+        <div class="header-logo-right">
+            <img src="SLP.png" alt="Sustainable Livelihood Program Logo" loading="lazy">
+        </div>
+    </header>
+
+    <nav class="nav-bar">
+        <a href="index.html" class="active">Home</a>
+        <a href="portfolio.html">Product Gallery</a>
+        <a href="about.html">About USWAG</a>
+        <a href="contact.html">Contact Us</a>
+        <a href="register.html">Register Now</a>
+    </nav>
+</div>
+
+<div class="container">
+    <div class="card-box">
+        <h2>Welcome to SLPA Livelihood Tracker</h2>
+        <p>Sustainable Livelihood Program Association of Aniog (SLPA) Samahan ng Masisinop is a community that deserves a system designed to make business easier. We help local producers in Barangay Aniog to track their goods, record sales, and monitor their income effortlessly.</p>
+    </div>
+
+    <!-- Compact Gallery Card -->
+    <div class="card-box compact-gallery-card">
+        <div class="gallery-wrapper">
+            <!-- Left Arrow Button -->
+            <button class="gal-arrow" id="prevBtn" aria-label="Previous">
+                <i class="fa-solid fa-chevron-left"></i>
+            </button>
+            
+            <!-- Gallery Viewport Window -->
+            <div class="gallery-viewport">
+                <div class="gallery-slider" id="gallerySlider">
+                    <img src="Aniog HQ.jpg" alt="SLPA Proof 1" loading="lazy" onclick="openImageModal(this.src)">
+                    <img src="Aniog SLP.jpg" alt="SLPA Proof 2" loading="lazy" onclick="openImageModal(this.src)">
+                    <img src="Aniog SLPA.jpg" alt="SLPA Proof 3" loading="lazy" onclick="openImageModal(this.src)">
+                    <img src="Kilohan.jpg" alt="SLPA Proof 9" loading="lazy" onclick="openImageModal(this.src)">
+                    <img src="Copra Stock.jpeg" alt="SLPA Proof 6" loading="lazy" onclick="openImageModal(this.src)">
+                    <img src="Copra Haul.jpeg" alt="SLPA Proof 4" loading="lazy" onclick="openImageModal(this.src)">
+                    <img src="Copra Hauling.jpg" alt="SLPA Proof 5" loading="lazy" onclick="openImageModal(this.src)">
+                    <img src="Copra.jpg" alt="SLPA Proof 7" loading="lazy" onclick="openImageModal(this.src)">
+                    <img src="Kokonut.jpeg" alt="SLPA Proof 10" loading="lazy" onclick="openImageModal(this.src)">
+                    <img src="Logistics.jpeg" alt="SLPA Proof 11" loading="lazy" onclick="openImageModal(this.src)">
+                    <img src="Mais Nakasako.jpeg" alt="SLPA Proof 8" loading="lazy" onclick="openImageModal(this.src)">
+                    <img src="Mais Ninda.jpeg" alt="SLPA Proof 12" loading="lazy" onclick="openImageModal(this.src)">
+                    <img src="Mais.jpeg" alt="SLPA Proof 13" loading="lazy" onclick="openImageModal(this.src)">
+                    <img src="SLPA Certification.jpg" alt="SLPA Proof 14" loading="lazy" onclick="openImageModal(this.src)">
+                    <img src="SLPA Map.jpg" alt="SLPA Proof 15" loading="lazy" onclick="openImageModal(this.src)">
+                </div>
+            </div>
+
+            <!-- Right Arrow Button -->
+            <button class="gal-arrow" id="nextBtn" aria-label="Next">
+                <i class="fa-solid fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <table class="feature-table">
+            <thead>
+                <tr>
+                    <th><b>Manage Your Products</b></th>
+                    <th><b>Work Anywhere</b></th>
+                    <th><b>Track Your Earnings</b></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Easily check and update your current stock of agricultural products, supplies and raw materials.</td>
+                    <td>Keep recording your sales even without an internet connection. The system will automatically update your records once you're back online.</td>
+                    <td>Clearly see your starting capital, everyday business expenses, cash flow analytics and total profits through dashboard.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Welcome Notification Modal -->
+<div id="welcomeAlertModal" class="custom-modal-overlay">
+    <div class="custom-modal-box">
+        <div class="success-icon-wrapper">
+            <i class="fa-solid fa-hands-holding-child"></i>
+        </div>
+        <h3 style="color: var(--primary-color);">Welcome to Samahan ng Masisinop Page!</h3>
+        <p style="text-align: center; margin: 15px 0;">This platform is powered by USWAG (Unified System for Work and Growth). We are here to support our local farmers, micro-entrepreneurs, and the community of Barangay Aniog by bringing buyers and sellers together in one easy-to-use digital space.</p>
+        <button onclick="dismissModal()" class="btn-submit">Acknowledge</button>
+    </div>
+</div>
+
+<!-- Fullscreen Lightbox Image Zoom Modal -->
+<div id="imageLightboxModal" class="custom-modal-overlay" onclick="closeLightbox()">
+    <span class="close-lightbox" onclick="closeLightbox()">&times;</span>
+    <img class="lightbox-content" id="lightboxImage" alt="Enlarged SLPA Photo">
+</div>
+
+<footer>
+    <p>© 2026 USWAG (Unified System for Work and Growth).</p>
+</footer>
+
+</body>
+</html>
