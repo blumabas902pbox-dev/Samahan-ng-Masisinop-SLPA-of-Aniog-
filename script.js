@@ -226,34 +226,43 @@ document.addEventListener("DOMContentLoaded", function() {
         setTimeout(triggerConfettiBurst, 150); 
     }
 
-    // --- 5. Initialize Compact Gallery ---
+    // --- 5. Initialize All Compact Galleries ---
     initGallery();
 });
 
 // =========================================================================
-// Refactored Gallery & Lightbox Logic
+// Multi-Instance Gallery & Lightbox Logic
 // =========================================================================
 
-let galleryPos = 0;
-
 function initGallery() {
-    const prevBtn = document.getElementById('prevBtn');
-    const nextBtn = document.getElementById('nextBtn');
-    const slider = document.getElementById('gallerySlider');
+    const wrappers = document.querySelectorAll('.gallery-wrapper');
+    if (wrappers.length === 0) return;
 
-    if (!slider) return;
+    wrappers.forEach(wrapper => {
+        // Track unique position state for each gallery slider instance
+        wrapper.dataset.galleryPos = "0";
 
-    if (prevBtn) prevBtn.addEventListener('click', () => moveGallery(-1));
-    if (nextBtn) nextBtn.addEventListener('click', () => moveGallery(1));
+        const slider = wrapper.querySelector('.gallery-slider');
+        const arrows = wrapper.querySelectorAll('.gal-arrow');
+        const prevBtn = arrows[0];
+        const nextBtn = arrows[1];
+
+        if (!slider) return;
+
+        if (prevBtn) prevBtn.addEventListener('click', () => moveGallery(wrapper, -1));
+        if (nextBtn) nextBtn.addEventListener('click', () => moveGallery(wrapper, 1));
+    });
 
     window.addEventListener('resize', () => {
-        galleryPos = 0; 
-        renderGallerySlide();
+        wrappers.forEach(wrapper => {
+            wrapper.dataset.galleryPos = "0";
+            renderGallerySlide(wrapper);
+        });
     });
 }
 
-function moveGallery(direction) {
-    const slider = document.getElementById('gallerySlider');
+function moveGallery(wrapper, direction) {
+    const slider = wrapper.querySelector('.gallery-slider');
     if (!slider || slider.children.length === 0) return;
 
     const isMobile = window.innerWidth <= 768;
@@ -262,26 +271,29 @@ function moveGallery(direction) {
     // Prevent negative bounds if total images are fewer than visible slots
     const maxIndex = Math.max(0, slider.children.length - visibleCount);
 
-    galleryPos += direction;
+    let currentPos = parseInt(wrapper.dataset.galleryPos || "0", 10);
+    currentPos += direction;
 
-    if (galleryPos < 0) galleryPos = 0;
-    if (galleryPos > maxIndex) galleryPos = maxIndex;
+    if (currentPos < 0) currentPos = 0;
+    if (currentPos > maxIndex) currentPos = maxIndex;
 
-    renderGallerySlide();
+    wrapper.dataset.galleryPos = currentPos;
+    renderGallerySlide(wrapper);
 }
 
-function renderGallerySlide() {
-    const slider = document.getElementById('gallerySlider');
+function renderGallerySlide(wrapper) {
+    const slider = wrapper.querySelector('.gallery-slider');
     if (!slider || slider.children.length === 0) return;
 
+    const currentPos = parseInt(wrapper.dataset.galleryPos || "0", 10);
     const imgWidth = slider.children[0].getBoundingClientRect().width;
     const gap = 12; // Must match CSS gap
 
-    const translateX = (imgWidth + gap) * galleryPos;
+    const translateX = (imgWidth + gap) * currentPos;
     slider.style.transform = `translateX(-${translateX}px)`;
 }
 
-// Lightbox Modal functions
+// Lightbox Modal functions (shared seamlessly across all sliders)
 function openImageModal(imgUrl) {
     const modal = document.getElementById('imageLightboxModal');
     const modalImg = document.getElementById('lightboxImage');

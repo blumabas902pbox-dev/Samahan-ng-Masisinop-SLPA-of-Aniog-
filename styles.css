@@ -29,6 +29,7 @@ body {
     line-height: 1.7;
     padding-top: 0;
     padding-bottom: 0;
+    overflow-x: hidden; /* Fixes mobile horizontal page shift and cut-off */
 }
 
 /* =========================================================================
@@ -149,6 +150,7 @@ footer p {
     margin: 0 auto;
     padding: 25px 20px;
     flex: 1;
+    width: 100%;
 }
 
 .container h2 {
@@ -160,7 +162,9 @@ footer p {
 
 .container h3 {
     color: var(--primary-color);
-    margin: 18px 0 10px 0;
+    margin: 10px 0 14px 0;
+    text-align: center;
+    font-size: 1.2rem;
 }
 
 .container p {
@@ -641,7 +645,6 @@ hr {
     height: auto;
     border-radius: 8px;
     box-shadow: 0 4px 25px rgba(0,0,0,0.6);
-    /* Crucial: 'contain' keeps natural image aspect ratio regardless of JPG/PNG dimensions */
     object-fit: contain; 
     animation: zoomIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
