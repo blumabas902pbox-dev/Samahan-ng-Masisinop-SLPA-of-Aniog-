@@ -4,9 +4,9 @@
 -- DESCRIPTION: Fresh Production Schema Prepared for Real Web Application CRUD Inputs
 -- =====================================================================================
 
-DROP DATABASE IF EXISTS uswag_db;
-CREATE DATABASE IF NOT EXISTS uswag_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE uswag_db;
+-- HOSTING-READY: the DROP/CREATE DATABASE and USE lines were removed.
+-- Import this file INTO the database your host gave you (phpMyAdmin > select DB > Import).
+-- Running it on WAMP? Create an empty database named uswag_db first, then import.
 
 -- =====================================================================================
 -- SECTION 1: 10 TABLE SCHEMAS
@@ -17,10 +17,12 @@ USE uswag_db;
 CREATE TABLE IF NOT EXISTS Accounts (
     account_id INT PRIMARY KEY AUTO_INCREMENT,
     role ENUM('Buyer', 'Seller', 'SLP Admin') NOT NULL DEFAULT 'Buyer',
-    username VARCHAR(50) NOT NULL UNIQUE,
+    username VARCHAR(50) NOT NULL,
     email VARCHAR(100) NOT NULL UNIQUE,
     contact_number VARCHAR(15) NOT NULL,
+    address VARCHAR(150) NULL,
     password_hash VARCHAR(255) NOT NULL,
+    api_token_hash CHAR(64) NULL,
     is_active TINYINT(1) DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_account_contact UNIQUE (contact_number)
@@ -36,7 +38,7 @@ CREATE TABLE IF NOT EXISTS Sellers (
     contact_number VARCHAR(15),
     barangay_zone VARCHAR(50) NOT NULL,
     slp_association VARCHAR(100) DEFAULT 'SLP Community Association',
-    join_date DATE DEFAULT (CURRENT_DATE),
+    join_date DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (account_id) REFERENCES Accounts(account_id) ON DELETE SET NULL,
     CONSTRAINT uq_seller_contact UNIQUE (contact_number)
 ) ENGINE=InnoDB;
@@ -74,8 +76,10 @@ CREATE TABLE IF NOT EXISTS Sales (
     sale_date DATETIME DEFAULT CURRENT_TIMESTAMP,
     status ENUM('Paid', 'Pending') DEFAULT 'Paid',
     sync_status ENUM('Online', 'Offline') DEFAULT 'Online',
+    client_id CHAR(36) NULL,
     FOREIGN KEY (seller_id) REFERENCES Sellers(seller_id) ON DELETE CASCADE,
-    FOREIGN KEY (buyer_account_id) REFERENCES Accounts(account_id) ON DELETE SET NULL
+    FOREIGN KEY (buyer_account_id) REFERENCES Accounts(account_id) ON DELETE SET NULL,
+    CONSTRAINT uq_sales_client_id UNIQUE (client_id)
 ) ENGINE=InnoDB;
 
 -- 6. Sale_Details Table
@@ -160,6 +164,7 @@ CREATE INDEX idx_saledetails_product ON Sale_Details(product_id);
 CREATE INDEX idx_expenses_seller ON Expenses(seller_id);
 CREATE INDEX idx_transactions_type ON Inventory_Transactions(transaction_type);
 CREATE INDEX idx_accounts_login ON Accounts(username, email, contact_number, is_active);
+CREATE INDEX idx_accounts_token ON Accounts(api_token_hash);
 CREATE INDEX idx_sales_sync ON Sales(sync_status, sale_date);
 CREATE INDEX idx_receipts_sync ON Receipts(sync_status, issued_at);
 
@@ -285,13 +290,17 @@ BEGIN
 END;
 //
 
--- TRIGGER 7: Automatically create a JSON receipt entry whenever a sale is marked Paid.
+-- TRIGGER 7: Create a JSON receipt (with item count and total) when a sale is marked Paid.
+-- The API saves a sale as Pending, adds its items, then marks it Paid, so the receipt has real totals.
 CREATE TRIGGER trg_generate_receipt_after_sale
-AFTER INSERT ON Sales
+AFTER UPDATE ON Sales
 FOR EACH ROW
 BEGIN
-    IF NEW.status = 'Paid' THEN
-        INSERT INTO Receipts (sale_id, account_id, receipt_number, receipt_type, receipt_data, sync_status)
+    DECLARE sale_total DECIMAL(10, 2) DEFAULT 0.00;
+    DECLARE sale_items INT DEFAULT 0;
+    IF OLD.status = 'Pending' AND NEW.status = 'Paid' THEN
+        SELECT COALESCE(SUM(line_total), 0.00), COUNT(*) INTO sale_total, sale_items FROM Sale_Details WHERE sale_id = NEW.sale_id;
+        INSERT IGNORE INTO Receipts (sale_id, account_id, receipt_number, receipt_type, receipt_data, sync_status)
         VALUES (
             NEW.sale_id,
             NEW.buyer_account_id,
@@ -302,6 +311,8 @@ BEGIN
                 'seller_id', NEW.seller_id,
                 'sale_id', NEW.sale_id,
                 'timestamp', NEW.sale_date,
+                'item_count', sale_items,
+                'total_amount', sale_total,
                 'payment_status', 'PROCESSED'
             ),
             IF(NEW.sync_status = 'Offline', 'Pending', 'Synced')
