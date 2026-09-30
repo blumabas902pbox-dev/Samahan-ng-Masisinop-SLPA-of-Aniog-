@@ -1,9 +1,5 @@
 // script.js - USWAG SLP Interactive Functions, Strict Modal Validation & Dynamic Gallery
 
-// >>> Put the address of your PHP host here (the place where process_register.php is uploaded) <<<
-const PHP_HOST = 'https://YOUR-PHP-HOST.example';   // <-- the ONLY line to edit (your PHP + MySQL host)
-const API_URL = location.hostname.endsWith('github.io') ? PHP_HOST + '/process_register.php' : 'process_register.php';
-
 function showWelcomeAlert() {
     const isAcknowledged = localStorage.getItem('uswag_welcome_acknowledged');
     const modal = document.getElementById('welcomeAlertModal');
@@ -190,29 +186,21 @@ document.addEventListener("DOMContentLoaded", function() {
                 return;
             }
 
-            if (submitBtn) submitBtn.disabled = true;
+            const formData = new FormData(regForm);
 
-            apiPost({
-                action: 'register',
-                username: usernameVal,
-                address: addressVal,
-                contact_number: contactVal,
-                role: roleVal,
-                password: passwordVal
+            fetch('process_register.php', {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData
             })
-            .then(({ ok, data }) => {
-                if (ok && data.status === 'success') {
-                    localStorage.setItem('uswag_token', data.token);
-                    localStorage.setItem('uswag_role', data.role);
-                    window.location.href = data.redirect || 'thankyou.html';
-                } else {
-                    triggerWarning(data.error || 'Registration failed. Please try again.');
-                }
+            .then(response => {
+                window.location.href = 'thankyou.html';
             })
-            .catch(() => {
-                triggerWarning('Cannot reach the server. Registration needs an internet connection, please try again.');
-            })
-            .finally(() => { if (submitBtn) submitBtn.disabled = false; });
+            .catch(error => {
+                window.location.href = 'thankyou.html';
+            });
         });
     }
 
@@ -319,222 +307,3 @@ function closeLightbox() {
     const modal = document.getElementById('imageLightboxModal');
     if (modal) modal.style.display = 'none';
 }
-
-
-// =========================================================================
-// API helper + Offline Sales Queue (browser storage -> PHP -> MySQL)
-// =========================================================================
-
-async function apiPost(payload) {
-    const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    });
-    let data = {};
-    try { data = await res.json(); } catch (e) { /* non-JSON reply */ }
-    return { ok: res.ok, status: res.status, data };
-}
-
-async function uswagLogin(contact, password) {
-    const { ok, data } = await apiPost({ action: 'login', contact_number: contact, password });
-    if (ok) {
-        localStorage.setItem('uswag_token', data.token);
-        localStorage.setItem('uswag_role', data.role);
-        syncSales();
-    }
-    return { ok, error: data.error };
-}
-
-function readQueue(key) {
-    try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { return []; }
-}
-function writeQueue(key, list) {
-    localStorage.setItem(key, JSON.stringify(list));
-}
-
-// sale = { status: 'Paid' | 'Pending', items: [{ product_id, quantity, unit_price }] }
-function queueSale(sale) {
-    if (localStorage.getItem('uswag_role') !== 'Seller') {
-        alert('Only Seller accounts can record sales.');
-        return false;
-    }
-    const q = readQueue('pendingSales');
-    q.push({
-        ...sale,
-        client_id: crypto.randomUUID(),          // prevents duplicates on the server
-        sale_date: new Date().toISOString(),
-        was_offline: !navigator.onLine
-    });
-    writeQueue('pendingSales', q);
-    syncSales();
-    return true;
-}
-
-let syncing = false;
-async function syncSales() {
-    const token = localStorage.getItem('uswag_token');
-    const q = readQueue('pendingSales');
-    if (syncing || !token || !q.length || !navigator.onLine) return;
-
-    syncing = true;
-    try {
-        const batch = q.slice(0, 100);
-        const { ok, data } = await apiPost({ action: 'sync_sales', token, sales: batch });
-        if (ok) {
-            const rejected = data.rejected || [];
-            const done = new Set([...(data.saved || []), ...rejected.map(r => r.client_id)]);
-            writeQueue('pendingSales', q.filter(s => !done.has(s.client_id)));
-
-            if (rejected.length) {   // keep rejected sales so the seller can review them
-                const failed = readQueue('failedSales');
-                rejected.forEach(r => {
-                    const original = batch.find(s => s.client_id === r.client_id);
-                    failed.push({ ...original, reason: r.reason });
-                });
-                writeQueue('failedSales', failed);
-            }
-        }
-    } catch (e) {
-        /* offline or server down: sales stay queued and retry later */
-    } finally {
-        syncing = false;
-    }
-}
-
-window.addEventListener('online', syncSales);
-document.addEventListener('DOMContentLoaded', syncSales);
-setInterval(syncSales, 60000);
-
-
-// =========================================================================
-// Login, live catalog (Buyer + Seller) and Seller tools
-// =========================================================================
-
-function esc(s) {
-    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-
-function initLogin() {
-    const btn = document.getElementById('loginBtn');
-    if (!btn) return;
-    btn.addEventListener('click', async () => {
-        const msg = document.getElementById('loginMsg');
-        const contact = document.getElementById('login_contact').value.trim();
-        const pw = document.getElementById('login_password').value;
-        msg.textContent = '';
-        if (!/^\d{11}$/.test(contact) || !pw) { msg.textContent = 'Enter your 11-digit contact number and password.'; return; }
-        btn.disabled = true;
-        try {
-            const r = await uswagLogin(contact, pw);
-            if (r.ok) window.location.href = 'portfolio.html'; else msg.textContent = r.error || 'Login failed.';
-        } catch (e) {
-            msg.textContent = 'Cannot reach the server. Login needs an internet connection.';
-        }
-        btn.disabled = false;
-    });
-}
-
-async function initPortfolio() {
-    const bar = document.getElementById('accountBar');
-    if (!bar) return;
-    const token = localStorage.getItem('uswag_token');
-    const role = localStorage.getItem('uswag_role');
-
-    bar.innerHTML = token
-        ? `Logged in as <strong>${esc(role)}</strong> &middot; <a href="#" id="logoutLink">Log out</a>`
-        : `<a href="register.html#login">Log in</a> or <a href="register.html">register</a> to contact sellers.`;
-    const out = document.getElementById('logoutLink');
-    if (out) out.addEventListener('click', e => {
-        e.preventDefault();
-        ['uswag_token', 'uswag_role', 'uswagDash'].forEach(k => localStorage.removeItem(k));
-        location.reload();
-    });
-
-    try {
-        const { ok, data } = await apiPost({ action: 'list_catalog', token });
-        if (ok && data.products && data.products.length) {
-            document.getElementById('liveTitle').style.display = 'block';
-            document.getElementById('liveGallery').innerHTML = data.products.map(p => `
-                <div class="card-box" style="padding:15px;margin-bottom:0;display:flex;flex-direction:column;justify-content:space-between;">
-                    <div>
-                        <h3 style="margin-top:0;font-size:1.1rem;">${esc(p.product_name)}</h3>
-                        <p style="margin-bottom:5px;font-size:0.9rem;"><strong>Category:</strong> ${esc(p.category_name)}</p>
-                        <p style="margin-bottom:5px;font-size:0.9rem;">&#8369;${Number(p.unit_price).toFixed(2)} / ${esc(p.unit_of_measure)} | Stock: ${Number(p.current_stock)} ${esc(p.unit_of_measure)}</p>
-                        <p style="margin-bottom:0;font-size:0.9rem;">Seller: ${esc(p.seller_name)}</p>
-                    </div>
-                    ${p.contact_number
-                        ? `<a href="tel:${esc(p.contact_number)}" class="btn-inquire"><i class="fa-solid fa-phone"></i> Call ${esc(p.contact_number)}</a>`
-                        : `<a href="register.html#login" class="btn-inquire">Log in to contact seller</a>`}
-                </div>`).join('');
-        }
-    } catch (e) { /* offline: the built-in gallery below still shows */ }
-
-    if (token && role === 'Seller') initSellerPanel();
-}
-
-async function initSellerPanel() {
-    const panel = document.getElementById('sellerPanel');
-    let d = null;
-    try {
-        const r = await apiPost({ action: 'dashboard', token: localStorage.getItem('uswag_token') });
-        if (r.ok) { d = r.data; localStorage.setItem('uswagDash', JSON.stringify(d)); }
-        else if (r.status === 401) { panel.innerHTML = '<div class="card-box">Session expired. <a href="register.html#login">Log in again</a>.</div>'; return; }
-    } catch (e) { /* offline */ }
-    if (!d) { try { d = JSON.parse(localStorage.getItem('uswagDash')); } catch (e) {} }   // cached copy works offline
-    if (!d) { panel.innerHTML = '<div class="card-box">Could not load your seller tools. Please check your connection.</div>'; return; }
-
-    const opt = (list, id, name) => list.map(x => `<option value="${x[id]}">${esc(x[name])}</option>`).join('');
-    panel.innerHTML = `
-        <div class="card-box">
-            <h3>Record a sale</h3>
-            <p style="font-size:0.9rem;margin-bottom:10px;">Balance: <strong>&#8369;${Number(d.balance).toFixed(2)}</strong> &middot; Waiting to sync: <strong id="pendingCount">${readQueue('pendingSales').length}</strong></p>
-            ${d.products.length ? `
-            <div class="form-group"><label>Product</label><select id="ss_product">${d.products.map(p => `<option value="${p.product_id}" data-price="${p.unit_price}">${esc(p.product_name)} (${Number(p.current_stock)} ${esc(p.unit_of_measure)})</option>`).join('')}</select></div>
-            <div class="form-group"><label>Quantity</label><input type="number" id="ss_qty" min="0" step="any"></div>
-            <div class="form-group"><label>Price per unit</label><input type="number" id="ss_price" min="0" step="any"></div>
-            <div class="form-group"><label>Payment</label><select id="ss_status"><option>Paid</option><option>Pending</option></select></div>
-            <p id="ssMsg" style="font-size:0.9rem;margin-bottom:10px;"></p>
-            <button type="button" id="ssBtn" class="btn-submit">Save sale</button>` : '<p>Add a product first.</p>'}
-        </div>
-        <div class="card-box">
-            <h3>Add a product</h3>
-            <div class="form-group"><label>Product name</label><input type="text" id="sp_name" maxlength="100"></div>
-            <div class="form-group"><label>Category</label><select id="sp_cat">${opt(d.categories, 'category_id', 'category_name')}</select></div>
-            <div class="form-group"><label>Unit (kg, sack, piece)</label><input type="text" id="sp_unit" maxlength="20" value="kg"></div>
-            <div class="form-group"><label>Price per unit</label><input type="number" id="sp_price" min="0" step="any"></div>
-            <div class="form-group"><label>Starting stock</label><input type="number" id="sp_stock" min="0" step="any" value="0"></div>
-            <p id="spMsg" style="font-size:0.9rem;margin-bottom:10px;"></p>
-            <button type="button" id="spBtn" class="btn-submit">Add product</button>
-        </div>`;
-
-    const sel = document.getElementById('ss_product');
-    if (sel) {
-        const fill = () => { document.getElementById('ss_price').value = sel.selectedOptions[0].dataset.price; };
-        sel.addEventListener('change', fill); fill();
-        document.getElementById('ssBtn').addEventListener('click', () => {
-            const qty = parseFloat(document.getElementById('ss_qty').value);
-            const price = parseFloat(document.getElementById('ss_price').value);
-            const msg = document.getElementById('ssMsg');
-            if (!(qty > 0) || !(price >= 0)) { msg.textContent = 'Enter a quantity and price.'; return; }
-            queueSale({ status: document.getElementById('ss_status').value, items: [{ product_id: +sel.value, quantity: qty, unit_price: price }] });
-            document.getElementById('ss_qty').value = '';
-            document.getElementById('pendingCount').textContent = readQueue('pendingSales').length;
-            msg.textContent = navigator.onLine ? 'Saved and sending...' : 'Saved on this phone. It will send when you are back online.';
-        });
-    }
-    document.getElementById('spBtn').addEventListener('click', async () => {
-        const msg = document.getElementById('spMsg');
-        try {
-            const r = await apiPost({
-                action: 'add_product', token: localStorage.getItem('uswag_token'),
-                product_name: document.getElementById('sp_name').value, category_id: +document.getElementById('sp_cat').value,
-                unit_of_measure: document.getElementById('sp_unit').value, unit_price: document.getElementById('sp_price').value,
-                stock: document.getElementById('sp_stock').value
-            });
-            if (r.ok) initSellerPanel(); else msg.textContent = r.data.error || 'Could not add the product.';
-        } catch (e) { msg.textContent = 'Adding products needs an internet connection.'; }
-    });
-}
-
-document.addEventListener('DOMContentLoaded', () => { initLogin(); initPortfolio(); });

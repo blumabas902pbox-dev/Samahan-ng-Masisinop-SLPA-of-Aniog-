@@ -17,7 +17,7 @@
 CREATE TABLE IF NOT EXISTS Accounts (
     account_id INT PRIMARY KEY AUTO_INCREMENT,
     role ENUM('Buyer', 'Seller', 'SLP Admin') NOT NULL DEFAULT 'Buyer',
-    username VARCHAR(50) NOT NULL,
+    username VARCHAR(50) NOT NULL UNIQUE,
     email VARCHAR(100) NOT NULL UNIQUE,
     contact_number VARCHAR(15) NOT NULL,
     address VARCHAR(150) NULL,
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS Sellers (
     contact_number VARCHAR(15),
     barangay_zone VARCHAR(50) NOT NULL,
     slp_association VARCHAR(100) DEFAULT 'SLP Community Association',
-    join_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    join_date DATE DEFAULT (CURRENT_DATE),
     FOREIGN KEY (account_id) REFERENCES Accounts(account_id) ON DELETE SET NULL,
     CONSTRAINT uq_seller_contact UNIQUE (contact_number)
 ) ENGINE=InnoDB;
@@ -290,17 +290,13 @@ BEGIN
 END;
 //
 
--- TRIGGER 7: Create a JSON receipt (with item count and total) when a sale is marked Paid.
--- The API saves a sale as Pending, adds its items, then marks it Paid, so the receipt has real totals.
+-- TRIGGER 7: Automatically create a JSON receipt entry whenever a sale is marked Paid.
 CREATE TRIGGER trg_generate_receipt_after_sale
-AFTER UPDATE ON Sales
+AFTER INSERT ON Sales
 FOR EACH ROW
 BEGIN
-    DECLARE sale_total DECIMAL(10, 2) DEFAULT 0.00;
-    DECLARE sale_items INT DEFAULT 0;
-    IF OLD.status = 'Pending' AND NEW.status = 'Paid' THEN
-        SELECT COALESCE(SUM(line_total), 0.00), COUNT(*) INTO sale_total, sale_items FROM Sale_Details WHERE sale_id = NEW.sale_id;
-        INSERT IGNORE INTO Receipts (sale_id, account_id, receipt_number, receipt_type, receipt_data, sync_status)
+    IF NEW.status = 'Paid' THEN
+        INSERT INTO Receipts (sale_id, account_id, receipt_number, receipt_type, receipt_data, sync_status)
         VALUES (
             NEW.sale_id,
             NEW.buyer_account_id,
@@ -311,8 +307,6 @@ BEGIN
                 'seller_id', NEW.seller_id,
                 'sale_id', NEW.sale_id,
                 'timestamp', NEW.sale_date,
-                'item_count', sale_items,
-                'total_amount', sale_total,
                 'payment_status', 'PROCESSED'
             ),
             IF(NEW.sync_status = 'Offline', 'Pending', 'Synced')

@@ -187,6 +187,11 @@ footer p {
     overflow: hidden;
 }
 
+.card-box img {
+    background-color: var(--pressed-color);
+    display: block;
+}
+
 .table-container {
     padding: 0;
     overflow-x: auto;
@@ -239,6 +244,7 @@ footer p {
     object-fit: cover;
     border-radius: 8px;
     margin-bottom: 12px;
+    background-color: var(--pressed-color);
 }
 
 /* =========================================================================
@@ -449,7 +455,7 @@ hr {
 .media-card .video-container video {
     width: 100%;
     height: auto;
-    aspect-ratio: 2 / 3;
+    aspect-ratio: 9 / 15.5;
     object-fit: cover;
     margin-bottom: 0;
     display: block;
@@ -521,7 +527,7 @@ hr {
     object-fit: cover; 
     border-radius: 8px;
     cursor: pointer;
-    background-color: #E8E8E8; 
+    background-color: var(--pressed-color); 
     transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
