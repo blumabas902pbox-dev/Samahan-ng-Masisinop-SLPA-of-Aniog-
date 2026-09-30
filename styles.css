@@ -455,7 +455,7 @@ hr {
 .media-card .video-container video {
     width: 100%;
     height: auto;
-    aspect-ratio: 9 / 16;
+    aspect-ratio: 9 / 16.5;
     object-fit: cover;
     margin-bottom: 0;
     display: block;
